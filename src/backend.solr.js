@@ -40,14 +40,8 @@ this.recline.Backend.Solr = this.recline.Backend.Solr || {};
 
   my.query = function(query, dataset) {
     var dfd = new $.Deferred();
-    var url = dataset.url + '/query';
-    var data = {
-      rows : query.size,
-      start : query.from,
-      q : query.q,
-      wt : 'json',
-      debugQuery : true
-    };
+    var url = dataset.url + '/select';
+    var data = makeQueryString(query);
 
     makeRequest({
       url : url,
@@ -57,12 +51,12 @@ this.recline.Backend.Solr = this.recline.Backend.Solr || {};
     }).done(function (data) {
       var records = data.response.docs;
       var total = data.response.numFound;
-
-      console.log(data);
+      var facets = getFacets(data);
 
       dfd.resolve({
         total : total,
-        hits : records
+        hits : records,
+        facets : facets
       });
 
     }).fail(function () {
@@ -71,6 +65,63 @@ this.recline.Backend.Solr = this.recline.Backend.Solr || {};
 
     return dfd;
   };
+// ### getFacets
+function getFacets(data) {
+  var facets = {};
+  var out = {};
+
+  if (data.facet_counts) {
+    facets = data.facet_counts.facet_fields;
+  }
+
+  // Process facets:
+  _.each(facets, function (counts, facet) {
+
+    // Process terms;
+    var term = null;
+    var terms = [];
+    _.each(counts, function (value) {
+      if (!term) {
+        term = value;
+      } else {
+        out[facet]
+        terms.push({
+          "term": term,
+          "count": value
+        });
+        term = null;
+      }
+    });
+
+    out[facet] = {
+      terms : terms
+    };
+  });
+
+  return out;
+}
+
+// ### makeQueryString
+function makeQueryString(query) {
+  var data = [];
+
+  data.push('q=' + encodeURIComponent(query.q));
+  data.push('rows=' + encodeURIComponent(query.size));
+  data.push('start=' + encodeURIComponent(query.from));
+  data.push('wt=json');
+  data.push('debugQuery=true');
+
+  if (query.facets) {
+    data.push('facet=true');
+    data.push('facet.limit=-1');
+    data.push('facet.zeros=false');
+    _.each(query.facets, function (facet) {
+      data.push('facet.field=' + encodeURIComponent(facet));
+    });
+  }
+
+  return data.join('&');
+}
 
 // ### makeReqest
 //

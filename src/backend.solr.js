@@ -110,6 +110,7 @@ function makeQueryString(query) {
   data.push('start=' + encodeURIComponent(query.from));
   data.push('wt=json');
   data.push('debugQuery=true');
+  data.push('defType=edismax');
 
   if (query.facets) {
     data.push('facet=true');
